@@ -1,53 +1,66 @@
-name: Automated Commit
+name: Human-like Daily Commit
 
 on:
-  push:
-    branches: [master]
-
   schedule:
-    - cron: '0 */4 * * *' # 4 jam sekali
+    - cron: '17 2 * * *'   # jam acak-ish (02:17 UTC)
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  update_commit:
+  daily_commit:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Setup Debug Information
-        run: echo "::debug::Triggered by ref = ${{ github.ref }}"
-
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v3
         with:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Generate Random Commits
+      - name: Simulate Human Activity
         run: |
-          # Tentukan jumlah commit acak (5-20)
-          commit_count=$(( ( RANDOM % 16 ) + 5 ))
-          echo "Jumlah commit hari ini: $commit_count"
-
           git config user.email "220705058@student.ar-raniry.ac.id"
           git config user.name "SyukurGit"
 
-          commit_messages=("Update: ⏰" "Refresh: 🔄" "Renew: 🌟" "Revise: 📝" "Amend: 🛠" "Adjust: 🔧" "Change: 📈" "Modify: 🖊" "Transform: 🌀" "Revamp: 🌈")
+          rand=$((RANDOM % 100))
+
+          if [ $rand -lt 5 ]; then
+            echo "Hari ini kosong (jarang banget) 🕳️"
+            exit 0
+          elif [ $rand -lt 55 ]; then
+            commit_count=$(( (RANDOM % 2) + 1 ))
+            echo "Hari ringan: $commit_count commit 🌱"
+          elif [ $rand -lt 85 ]; then
+            commit_count=$(( (RANDOM % 3) + 3 ))
+            echo "Hari sedang: $commit_count commit 🌿"
+          else
+            commit_count=$(( (RANDOM % 7) + 8 ))
+            echo "Hari berat: $commit_count commit 🌳"
+          fi
+
+          commit_messages=(
+            "Minor cleanup"
+            "Small adjustment"
+            "Refactor snippet"
+            "Update logic"
+            "Improve flow"
+            "Fix formatting"
+            "Optimize part"
+          )
 
           for i in $(seq 1 $commit_count); do
+            sleep_time=$(( (RANDOM % 180) + 60 )) # 1–4 menit
+            sleep $sleep_time
+
             current_time=$(date '+%Y-%m-%d %H:%M:%S')
-            random_msg=${commit_messages[$RANDOM % ${#commit_messages[@]}]}
+            msg=${commit_messages[$RANDOM % ${#commit_messages[@]}]}
 
-            echo "Updated on $current_time - Commit #$i" > TIMESTAMP.txt
+            echo "$msg at $current_time" > daily_activity.log
 
-            git add TIMESTAMP.txt
-            git commit -m "$random_msg - $current_time (Commit $i)" || echo "No changes."
-            sleep 2 # jeda biar kelihatan beda waktu commit
+            git add daily_activity.log
+            git commit -m "$msg ($current_time)" || true
           done
 
-      - name: Push to GitHub
-        uses: ad-m/github-push-action@v0.6.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git push origin master
