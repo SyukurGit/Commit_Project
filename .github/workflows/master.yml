@@ -1,66 +1,78 @@
-name: Human-like Daily Commit
+name: Periodic Repository Maintenance
 
 on:
   schedule:
-    - cron: '17 2 * * *'   # jam acak-ish (02:17 UTC)
+    # 02:17 UTC = 09:17 WIB
+    # Minggu, Senin, Selasa, Kamis
+    # Jeda: 1 hari → 1 hari → 2 hari → 3 hari
+    - cron: '17 2 * * 0,1,2,4'
+
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  daily_commit:
+  maintenance:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          persist-credentials: true
           fetch-depth: 0
 
-      - name: Simulate Human Activity
+      - name: Configure Git
+        shell: bash
         run: |
-          git config user.email "220705058@student.ar-raniry.ac.id"
           git config user.name "SyukurGit"
+          git config user.email "220705058@student.ar-raniry.ac.id"
 
-          rand=$((RANDOM % 100))
+      - name: Run repository maintenance
+        shell: bash
+        run: |
+          echo "Running scheduled repository maintenance..."
 
-          if [ $rand -lt 5 ]; then
-            echo "Hari ini kosong (jarang banget) 🕳️"
-            exit 0
-          elif [ $rand -lt 55 ]; then
-            commit_count=$(( (RANDOM % 2) + 1 ))
-            echo "Hari ringan: $commit_count commit 🌱"
-          elif [ $rand -lt 85 ]; then
-            commit_count=$(( (RANDOM % 3) + 3 ))
-            echo "Hari sedang: $commit_count commit 🌿"
-          else
-            commit_count=$(( (RANDOM % 7) + 8 ))
-            echo "Hari berat: $commit_count commit 🌳"
+          # Jalankan maintenance nyata di sini.
+          #
+          # Contoh:
+          # python scripts/update_project_index.py
+          # npm run generate:metadata
+          # bash scripts/update-readme-data.sh
+          #
+          # Kalau script belum ada, workflow tetap aman
+          # dan tidak akan membuat commit kosong.
+
+          if [ -f "scripts/update-readme-data.sh" ]; then
+            bash scripts/update-readme-data.sh
           fi
 
-          commit_messages=(
-            "Minor cleanup"
-            "Small adjustment"
-            "Refactor snippet"
-            "Update logic"
-            "Improve flow"
-            "Fix formatting"
-            "Optimize part"
-          )
+          if [ -f "scripts/update_project_index.py" ]; then
+            python scripts/update_project_index.py
+          fi
 
-          for i in $(seq 1 $commit_count); do
-            sleep_time=$(( (RANDOM % 180) + 60 )) # 1–4 menit
-            sleep $sleep_time
+      - name: Check for changes
+        id: changes
+        shell: bash
+        run: |
+          git add -A
 
-            current_time=$(date '+%Y-%m-%d %H:%M:%S')
-            msg=${commit_messages[$RANDOM % ${#commit_messages[@]}]}
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No repository changes detected."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Repository changes detected."
+          fi
 
-            echo "$msg at $current_time" > daily_activity.log
+      - name: Commit changes
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git commit -m "chore: periodic repository maintenance"
 
-            git add daily_activity.log
-            git commit -m "$msg ($current_time)" || true
-          done
-
-          git push origin master
+      - name: Push changes
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git push origin HEAD
